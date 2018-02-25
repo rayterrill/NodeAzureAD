@@ -8,6 +8,10 @@ var passport = require('passport');
 var bunyan = require('bunyan');
 var config = require('./config');
 
+// set up database for express session
+var MongoStore = require('connect-mongo')(expressSession);
+var mongoose = require('mongoose');
+
 var OIDCStrategy = require('passport-azure-ad').OIDCStrategy;
 
 var log = bunyan.createLogger({
@@ -86,7 +90,20 @@ app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(cookieParser());
 
-app.use(expressSession({ secret: 'keyboard cat', resave: true, saveUninitialized: false }));
+// set up session middleware
+if (config.useMongoDBSessionStore) {
+  mongoose.connect(config.databaseUri);
+  app.use(expressSession({
+    secret: 'secret',
+    cookie: {maxAge: config.mongoDBSessionMaxAge * 1000},
+    store: new MongoStore({
+      mongooseConnection: mongoose.connection,
+      clear_interval: config.mongoDBSessionMaxAge
+    })
+  }));
+} else {
+  app.use(expressSession({ secret: 'keyboard cat', resave: true, saveUninitialized: false }));
+}
 
 app.use(bodyParser.urlencoded({ extended : true }));
 
